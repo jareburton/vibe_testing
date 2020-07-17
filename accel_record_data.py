@@ -3,6 +3,7 @@
 import time
 import board, busio, adafruit_adxl34x
 import os, sys, getopt
+from math import ceil
 
 ## Board and accel setup
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -22,15 +23,23 @@ dt = 1./500
 num_readings = 4000
 file_name = 'accel_data_default.csv'
 remove_file = False
+time_specified = 0
 
 #allow user to input custom arguments
-opts, args = getopt.getopt(sys.argv[1:],'rhn:f:o:',['num_samples=','freq=','output_file='])
+opts, args = getopt.getopt(sys.argv[1:],'rhn:t:f:o:',['num_samples=','time=','freq=','output_file='])
 for opt, arg in opts:
     if opt in ('-h'):
-        print('accel_record_data.py -n <num_samples> -f <frequency_hz> -o <output_file_csv>')
+        print('accel_record_data.py -n <num_samples> (or) -t <duration_sec> -f <frequency_hz> -o <output_file_csv>')
         sys.exit(2)
     elif opt in ('-n', '--num_samples'):
         num_readings = int(arg)
+    elif opt in ('-t', '--time'):
+        time_specified = float(arg)
+        if time_specified < 0:
+            print('Duration cannot be negative.')
+            sys.exit(2)
+        if time_specified == 0:
+            print('Duration 0 will use specified number of samples')
     elif opt in ('-f', '--freq'):
         f = float(arg)
         if f > 500:
@@ -40,6 +49,10 @@ for opt, arg in opts:
         file_name = str(arg)
     elif opt in ('-r'):
         remove_file = True
+
+#calculate num samples according to time duration and freq
+if time_specified > 0:
+    num_readings = ceil(time_specified/dt)
 
 #open file (and remove if necessary)
 if os.path.exists(file_name):
@@ -51,6 +64,7 @@ if os.path.exists(file_name):
         sys.exit(2)
 f = open(file_name,'a')
 
+print('Capturing ' + str(num_readings) + ' samples...')
 count = 0
 bt = time.time()
 temp_t = bt
