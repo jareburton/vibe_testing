@@ -4,17 +4,19 @@ import os, sys, getopt
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
+import pandas as pd
 
 #assign defaults
 dt = 1./500
 file_name = 'accel_data_default.csv'
-out_name = 'accel_fft_plot.png'
+out_name = 'accel_fft_default.csv'
+out_name_image = 'accel_fft_plot.png'
 
 #allow user to input custom arguments
-opts, args = getopt.getopt(sys.argv[1:],'hf:i:o:',['freq=','input_file=','output_file='])
+opts, args = getopt.getopt(sys.argv[1:],'hf:i:o:io:',['freq=','input_file=','output_file=','image_output_file='])
 for opt, arg in opts:
     if opt in ('-h'):
-        print('accel_fft.py -f <frequency_hz> -i <input_file_csv> -o <output_file_image>')
+        print('accel_fft.py -f <frequency_hz> -i <input_file_csv> -o <output_file_csv> -io <output_file_image>')
         sys.exit(2)
     elif opt in ('-f', '--freq'):
         f = float(arg)
@@ -23,6 +25,8 @@ for opt, arg in opts:
         file_name = str(arg)
     elif opt in ('-o', '--output_file'):
         out_name = str(arg)
+    elif opt in ('-io', '--image_output_file'):
+        out_name_image = str(arg)
 
 #open and read file if available
 if not os.path.exists(file_name):
@@ -64,6 +68,11 @@ psd_z = np.square(fft_z_mag)/(2*df)
 psd_x[0] = 0
 psd_y[0] = 0
 psd_z[0] = 0
+
+#put data in dataframe and save to csv
+df = pd.DataFrame({'fs':fs, 'fft_x_mag':fft_x_mag, 'fft_y_mag':fft_y_mag, 'fft_z_mag':fft_z_mag, 'psd_x':psd_x, 'psd_y':psd_y, 'psd_z':psd_z})
+df.to_csv(out_name, index=False)
+print('FFT output saved at: ' + out_name)
 
 fmin = fs[0]
 fmax = fs[-1]
@@ -117,7 +126,7 @@ plt.ylabel('Accel z (m^2.s^-4.Hz^-1)')
 plt.title('Acceleration z PSD w/ mean removed')
 ax.set_xticks(np.linspace(fmin, fmax, 10))
 
-plt.savefig(out_name)
-print('Plot saved at: ' + out_name)
+plt.savefig(out_name_image)
+print('Plot saved at: ' + out_name_image)
 #plt.show()
 
