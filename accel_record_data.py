@@ -4,82 +4,77 @@ import time
 import board, busio, adafruit_adxl34x
 import os, sys, getopt
 from math import ceil
+import argparse
 
-## Board and accel setup
-i2c = busio.I2C(board.SCL, board.SDA)
-# For ADXL345
-accelerometer = adafruit_adxl34x.ADXL345(i2c)
-accelerometer.enable_freefall_detection()
-accelerometer.disable_freefall_detection()
-accelerometer.enable_motion_detection()
-accelerometer.disable_motion_detection()
-accelerometer.enable_tap_detection()
-accelerometer.disable_tap_detection()
-
-#assign defaults
-accelerometer.data_rate = adafruit_adxl34x.DataRate.RATE_400_HZ
-accelerometer.range = adafruit_adxl34x.Range.RANGE_16_G
-dt = 1./500
-num_readings = 4000
-file_name = 'accel_data_default.csv'
-remove_file = False
-time_specified = 0
-
-#allow user to input custom arguments
-opts, args = getopt.getopt(sys.argv[1:],'rhn:t:f:o:',['num_samples=','time=','freq=','output_file='])
-for opt, arg in opts:
-    if opt in ('-h'):
-        print('accel_record_data.py -n <num_samples> (or) -t <duration_sec> -f <frequency_hz> -o <output_file_csv>')
+def record_accel_data(file_name='accel_data_default.csv', remove_file=False, num_readings=0, duration=0, frequency=500):
+    if frequency > 500:
+        print('Warning: requests to sample above 500 Hz may not be satisfied')
+    if num_readings != 0 and duration != 0:
+        print('Duration and number of readings cannot both be specified.')
         sys.exit(2)
-    elif opt in ('-n', '--num_samples'):
-        num_readings = int(arg)
-    elif opt in ('-t', '--time'):
-        time_specified = float(arg)
-        if time_specified < 0:
-            print('Duration cannot be negative.')
+    if num_readings == 0 and duration == 0:
+        num_readings = 4000
+    #calculate num samples according to time duration and freq
+    if duration != 0:
+        num_readings = ceil(duration*frequency)
+    
+    dt = 1.0/frequency
+    
+    ## Board and accel setup
+    i2c = busio.I2C(board.SCL, board.SDA)
+    # For ADXL345
+    accelerometer = adafruit_adxl34x.ADXL345(i2c)
+    accelerometer.enable_freefall_detection()
+    accelerometer.disable_freefall_detection()
+    accelerometer.enable_motion_detection()
+    accelerometer.disable_motion_detection()
+    accelerometer.enable_tap_detection()
+    accelerometer.disable_tap_detection()
+
+    #assign defaults
+    accelerometer.data_rate = adafruit_adxl34x.DataRate.RATE_400_HZ
+    accelerometer.range = adafruit_adxl34x.Range.RANGE_16_G
+
+    #open file (and remove if necessary)
+    if os.path.exists(file_name):
+        if remove_file:
+            print('Output file exists, removing file.')
+            os.remove(file_name)
+        else:
+            print('Output file already exists.')
             sys.exit(2)
-        if time_specified == 0:
-            print('Duration 0 will use specified number of samples')
-    elif opt in ('-f', '--freq'):
-        f = float(arg)
-        if f > 500:
-            print('Warning: requests to sample above 500 Hz may not be satisfied')
-        dt = 1./f
-    elif opt in ('-o', '--output_file'):
-        file_name = str(arg)
-    elif opt in ('-r'):
-        remove_file = True
+    f = open(file_name,'a')
 
-#calculate num samples according to time duration and freq
-if time_specified > 0:
-    num_readings = ceil(time_specified/dt)
+    print('Capturing ' + str(num_readings) + ' samples...')
+    count = 0
+    bt = time.time()
+    temp_t = bt
+    while count < num_readings:
+        accel = accelerometer.acceleration
+        f.write('{:.16f},{:.8f},{:.8f},{:.8f}\n'.format(time.time(), accel[0], accel[1], accel[2]))
+        count += 1
 
-#open file (and remove if necessary)
-if os.path.exists(file_name):
-    if remove_file:
-        print('Output file exists, removing file.')
-        os.remove(file_name)
-    else:
-        print('Output file already exists. Specify -r to remove.')
-        sys.exit(2)
-f = open(file_name,'a')
+        new_t = temp_t + dt
+        while True:
+            if time.time() >= new_t:
+                break
+        temp_t = new_t
+    et = time.time()
+    del_t = et-bt
+    f_avg = num_readings/del_t
+    print('time_elapsed: ' + str(del_t))
+    print('avg read freq: ' + str(f_avg))
+    return (del_t, f_avg)
 
-print('Capturing ' + str(num_readings) + ' samples...')
-count = 0
-bt = time.time()
-temp_t = bt
-while count < num_readings:
-    accel = accelerometer.acceleration
-    f.write('{:.16f},{:.8f},{:.8f},{:.8f}\n'.format(time.time(), accel[0], accel[1], accel[2]))
-    count += 1
+if __name__ == '__main__':
 
-    new_t = temp_t + dt
-    while True:
-        if time.time() >= new_t:
-            break
-    temp_t = new_t
-et = time.time()
-del_t = et-bt
-print('time_elapsed: ' + str(del_t))
-print('avg read freq: ' + str(num_readings/del_t))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-r', action='store_true', help='removes output file if it exists')
+    parser.add_argument('-n', '--num_samples', dest='n', type=int, default=0, help='sets number of samples')
+    parser.add_argument('-t', '--time', dest='t', type=float, default=0, help='sets record duration (s)')
+    parser.add_argument('-f', '--freq', dest='f', type=float, default=500.0, help='sets record frequency (Hz)')
+    parser.add_argument('-o', '--output_file', dest='o', type=str, default='accel_data_default.csv', help='sets output file')
+    args = parser.parse_args()
+
+    record_accel_data(file_name=args.o, remove_file=args.r, num_readings=args.n, duration=args.t, frequency=args.f)
 

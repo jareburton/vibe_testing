@@ -27,8 +27,10 @@ def play_tone(freq, duration, sample_rate=44100):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--freq', dest='freq', type=float, required=True, help='sets tone frequency (Hz)')
-    parser.add_argument('--dur', dest='duration', type=float, required=True, help='sets tone duration (s)')
+    #parser.add_argument('--freq', dest='freq', type=float, required=True, help='sets tone frequency (Hz)')
+    #parser.add_argument('--dur', dest='duration', type=float, required=True, help='sets tone duration (s)')
+    parser.add_argument('freq', type=float, help='sets tone frequency (Hz)')
+    parser.add_argument('duration', type=float, help='sets tone duration (s)')
     args = parser.parse_args()
 
     play_tone(args.freq, args.duration)
